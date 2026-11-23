@@ -1,0 +1,48 @@
+name: Publish
+
+# 通过 PyPI Trusted Publishing（OIDC）发布，不使用 API Token：
+# 发布凭据由 GitHub 的 OIDC 身份在运行时换取，有效期只有本次 job。
+#
+# 首次使用前需在 PyPI 添加一个 "pending publisher"，参数见 docs/发布.md：
+#   Project name    : pre-sales-kit
+#   Owner           : zhang1024899756
+#   Repository name : pre-sales-kit
+#   Workflow name   : publish.yml
+#   Environment     : pypi
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+concurrency:
+  group: publish
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    name: 构建并发布到 PyPI
+    runs-on: ubuntu-latest
+    environment:
+      name: pypi
+      url: https://pypi.org/p/pre-sales-kit
+    permissions:
+      contents: read
+      id-token: write          # Trusted Publishing 必需；缺了这一步会拿不到 OIDC
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: 构建 sdist 与 wheel
+        run: |
+          python -m pip install --upgrade build twine
+          python -m build
+          twine check dist/*
+
+      - name: 发布到 PyPI
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          print-hash: true
