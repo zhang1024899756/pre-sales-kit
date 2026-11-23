@@ -1,5 +1,9 @@
 # pre-sales-kit · 售前现场工具箱
 
+[![CI](https://github.com/zhang1024899756/pre-sales-kit/actions/workflows/ci.yml/badge.svg?branch=master)](https://github.com/zhang1024899756/pre-sales-kit/actions/workflows/ci.yml)
+[![Python](https://img.shields.io/badge/python-3.11%20%7C%203.12-blue)](https://github.com/zhang1024899756/pre-sales-kit/blob/master/pyproject.toml)
+[![License: MIT](https://img.shields.io/badge/license-MIT-green)](LICENSE)
+
 六个命令，对应售前技术支持真正在消耗时间的三件事，外加三件「装和用」的杂事：
 
 | 命令 | 解决什么 | 一句话 |
