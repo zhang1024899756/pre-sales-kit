@@ -1,6 +1,7 @@
 # pre-sales-kit · 售前现场工具箱
 
 [![CI](https://github.com/zhang1024899756/pre-sales-kit/actions/workflows/ci.yml/badge.svg?branch=master)](https://github.com/zhang1024899756/pre-sales-kit/actions/workflows/ci.yml)
+[![PyPI](https://img.shields.io/pypi/v/pre-sales-kit?label=pypi)](https://pypi.org/project/pre-sales-kit/)
 [![Python](https://img.shields.io/badge/python-3.11%20%7C%203.12-blue)](https://github.com/zhang1024899756/pre-sales-kit/blob/master/pyproject.toml)
 [![License: MIT](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 
@@ -38,20 +39,18 @@
 
 ## 安装
 
-需要 Python 3.11 或 3.12。
+需要 Python 3.11 或 3.12。已发布到 PyPI：
 
 ```bash
-# 1. 拿到 wheel（有外网 / 发布之后就是 pipx install pre-sales-kit）
-python -m hatchling build -t wheel        # 产物在 dist/
+pipx install pre-sales-kit     # 推荐：装成独立命令行工具，不污染项目环境
+# 或
+pip install pre-sales-kit
 
-# 2. 装
-python -m pip install dist/pre_sales_kit-0.2.0-py3-none-any.whl
-
-# 3. 确认装对了
-kit selfcheck
+kit --version                  # 应输出 pre-sales-kit 0.2.0
+kit selfcheck                  # 12 项安装自检
 ```
 
-四条安装路径（含**内网离线安装**、多个版本并存时的排查）见 **[docs/安装.md](docs/安装.md)**。
+**内网离线安装**、**从源码装**、**多版本并存排查** 等四条路径见 **[docs/安装.md](docs/安装.md)**。
 
 三个入口等价：`kit` / `pskit` / `python -m pre_sales_kit`。
 
