@@ -41,7 +41,10 @@ kit = "pre_sales_kit.cli:main"
 pskit = "pre_sales_kit.cli:main"
 
 [project.urls]
-Homepage = "https://github.com/arvinzxy/pre-sales-kit"
+Homepage = "https://github.com/zhang1024899756/pre-sales-kit"
+Repository = "https://github.com/zhang1024899756/pre-sales-kit"
+Issues = "https://github.com/zhang1024899756/pre-sales-kit/issues"
+Changelog = "https://github.com/zhang1024899756/pre-sales-kit/blob/master/CHANGELOG.md"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/pre_sales_kit"]
