@@ -1,0 +1,698 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>客户现场演示环境自检 · 现场体检报告</title>
+<style>
+:root {
+  color-scheme: light;
+  --paper: #fbfaf7;
+  --surface: #ffffff;
+  --ink: #16181d;
+  --ink-soft: #3d4149;
+  --muted: #666b75;
+  --rule: #e4e1d8;
+  --rule-strong: #cfcbbf;
+  --pass: #1b6b45;
+  --pass-bg: #e8f1ea;
+  --warn: #7a4b00;
+  --warn-bg: #fbf0d9;
+  --fail: #a32020;
+  --fail-bg: #fae9e9;
+  --skip: #565b63;
+  --skip-bg: #efeee9;
+  --radius: 2px;
+  --sans: ui-sans-serif, -apple-system, "Segoe UI", "Microsoft YaHei UI", "PingFang SC",
+    "Hiragino Sans GB", sans-serif;
+  --mono: "Cascadia Mono", "SF Mono", "JetBrains Mono", Consolas, "Liberation Mono", monospace;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--sans);
+  font-size: 15px;
+  line-height: 1.55;
+  font-variant-numeric: tabular-nums;
+}
+
+code,
+.mono {
+  font-family: var(--mono);
+  font-size: 0.92em;
+}
+
+.sheet {
+  max-width: 920px;
+  min-height: 100vh;
+  margin: 0 auto;
+  padding: 56px 56px 44px;
+  background: var(--surface);
+  border-left: 1px solid var(--rule);
+  border-right: 1px solid var(--rule);
+}
+
+[data-status="pass"] .mark {
+  color: var(--pass);
+}
+
+[data-status="warn"] .mark {
+  color: var(--warn);
+}
+
+[data-status="fail"] .mark {
+  color: var(--fail);
+}
+
+[data-status="skip"] .mark {
+  color: var(--skip);
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+h1,
+h2,
+h3,
+p,
+dl,
+dd,
+ul {
+  margin: 0;
+}
+
+a {
+  color: inherit;
+}
+
+@media (max-width: 720px) {
+  .sheet {
+    padding: 28px 20px 32px;
+    border: 0;
+  }
+}
+
+@media print {
+  @page {
+    margin: 14mm;
+  }
+
+  body {
+    background: #fff;
+    font-size: 11.5pt;
+  }
+
+  .sheet {
+    max-width: none;
+    min-height: 0;
+    padding: 0;
+    border: 0;
+  }
+
+  .check,
+  .fixes,
+  .strip {
+    break-inside: avoid;
+  }
+}
+.masthead {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 32px;
+  align-items: end;
+  padding-bottom: 22px;
+  border-bottom: 2px solid var(--ink);
+}
+
+.wordmark {
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+h1 {
+  margin: 10px 0 6px;
+  font-size: 30px;
+  line-height: 1.15;
+  font-weight: 650;
+  letter-spacing: -0.01em;
+}
+
+.subtitle {
+  font-size: 13px;
+  color: var(--muted);
+  overflow-wrap: anywhere;
+}
+
+.verdict {
+  text-align: right;
+  padding-bottom: 2px;
+}
+
+.verdict-word {
+  display: block;
+  font-size: 38px;
+  line-height: 1;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+.verdict[data-status="pass"] .verdict-word { color: var(--pass); }
+.verdict[data-status="warn"] .verdict-word { color: var(--warn); }
+.verdict[data-status="fail"] .verdict-word { color: var(--fail); }
+.verdict[data-status="skip"] .verdict-word { color: var(--skip); }
+
+.verdict-detail {
+  display: block;
+  max-width: 260px;
+  margin-top: 10px;
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: var(--muted);
+}
+
+.strip {
+  display: flex;
+  flex-wrap: wrap;
+  border-bottom: 1px solid var(--rule);
+}
+
+.count {
+  flex: 1 1 0;
+  min-width: 108px;
+  padding: 18px 16px 18px 0;
+}
+
+.count + .count {
+  padding-left: 20px;
+  border-left: 1px solid var(--rule);
+}
+
+.count .num {
+  display: block;
+  font-family: var(--mono);
+  font-size: 26px;
+  line-height: 1;
+  font-weight: 600;
+}
+
+[data-status="pass"] .num { color: var(--pass); }
+[data-status="warn"] .num { color: var(--warn); }
+[data-status="fail"] .num { color: var(--fail); }
+[data-status="skip"] .num { color: var(--skip); }
+
+.count .lbl {
+  display: block;
+  margin-top: 6px;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.facts {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px 28px;
+  padding: 20px 0 0;
+}
+
+.facts dt {
+  font-size: 10.5px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.facts dd {
+  margin-top: 3px;
+  font-size: 13px;
+  color: var(--ink-soft);
+  overflow-wrap: anywhere;
+}
+
+.section-title {
+  margin: 38px 0 4px;
+  font-size: 11px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  font-weight: 600;
+  color: var(--muted);
+}
+
+.check {
+  padding: 16px 0 14px;
+  border-top: 1px solid var(--rule);
+}
+
+.check-head {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+}
+
+.check-mark {
+  width: 13px;
+  font-weight: 700;
+}
+
+.check-name {
+  flex: 1 1 auto;
+  font-size: 17px;
+  font-weight: 600;
+  line-height: 1.35;
+}
+
+.badge {
+  flex: 0 0 auto;
+  padding: 1px 6px;
+  border: 1px solid var(--rule-strong);
+  border-radius: var(--radius);
+  font-family: var(--mono);
+  font-size: 10.5px;
+  color: var(--muted);
+}
+
+.check-dur {
+  flex: 0 0 auto;
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.check-detail {
+  margin: 7px 0 0 23px;
+  font-size: 13.5px;
+  color: var(--ink);
+  overflow-wrap: anywhere;
+}
+
+.check-detail[data-status="warn"] { color: var(--warn); }
+.check-detail[data-status="fail"] { color: var(--fail); }
+.check-detail[data-status="skip"] { color: var(--muted); }
+
+.check-hint {
+  margin: 3px 0 0 23px;
+  font-size: 12.5px;
+  color: var(--muted);
+}
+
+.check-hint::before { content: "→ "; }
+
+.items {
+  list-style: none;
+  margin-top: 8px;
+  padding: 0;
+}
+
+.item {
+  display: grid;
+  grid-template-columns: 13px 200px minmax(0, 1fr);
+  gap: 10px;
+  padding: 3px 0;
+}
+
+.item .label {
+  font-size: 13px;
+  color: var(--ink-soft);
+  overflow-wrap: anywhere;
+}
+
+.item .detail {
+  font-size: 13px;
+  color: var(--ink);
+  overflow-wrap: anywhere;
+}
+
+.item[data-status="warn"] .detail { color: var(--warn); }
+.item[data-status="fail"] .detail { color: var(--fail); }
+.item[data-status="skip"] .detail { color: var(--muted); }
+
+.item .hint {
+  grid-column: 2 / 4;
+  margin-top: 2px;
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: var(--muted);
+}
+
+.item .hint::before {
+  content: "→ ";
+}
+
+.fix-table {
+  width: 100%;
+  margin-top: 10px;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.fix-table th {
+  padding: 6px 12px 6px 0;
+  text-align: left;
+  font-size: 10.5px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  font-weight: 600;
+  color: var(--muted);
+  border-bottom: 1px solid var(--rule-strong);
+}
+
+.fix-table td {
+  padding: 8px 12px 8px 0;
+  vertical-align: top;
+  border-bottom: 1px solid var(--rule);
+}
+
+.fix-table td:last-child,
+.fix-table th:last-child {
+  padding-right: 0;
+}
+
+.fix-table .mark {
+  font-weight: 700;
+}
+
+.note {
+  margin-top: 34px;
+  padding: 14px 16px;
+  border: 1px solid var(--rule);
+  border-left: 3px solid var(--rule-strong);
+  border-radius: var(--radius);
+  font-size: 12.5px;
+  line-height: 1.6;
+  color: var(--muted);
+}
+
+.note strong {
+  color: var(--ink-soft);
+  font-weight: 600;
+}
+
+footer {
+  margin-top: 36px;
+  padding-top: 14px;
+  border-top: 1px solid var(--rule);
+  font-size: 11.5px;
+  color: var(--muted);
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 16px;
+  justify-content: space-between;
+}
+
+@media (max-width: 720px) {
+  .masthead {
+    grid-template-columns: 1fr;
+    gap: 18px;
+  }
+
+  .verdict {
+    text-align: left;
+  }
+
+  .verdict-detail {
+    max-width: none;
+  }
+
+  h1 {
+    font-size: 24px;
+  }
+
+  .facts {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .item {
+    grid-template-columns: 13px minmax(0, 1fr);
+  }
+
+  .item .detail,
+  .item .hint {
+    grid-column: 2 / 3;
+  }
+
+  .fix-table thead {
+    display: none;
+  }
+
+  .fix-table tr {
+    display: block;
+    padding: 8px 0;
+    border-bottom: 1px solid var(--rule);
+  }
+
+  .fix-table td {
+    display: block;
+    padding: 0;
+    border: 0;
+  }
+}
+</style>
+</head>
+<body>
+<div class="sheet">
+  <header class="masthead">
+    <div>
+      <p class="wordmark">pre-sales-kit / kit doctor</p>
+      <h1>客户现场演示环境自检</h1>
+      <p class="subtitle">华东某汽车零部件厂 · 产线能耗与设备监控演示 &middot; <span class="mono">examples\doctor.yaml</span></p>
+    </div>
+    <div class="verdict" data-status="warn">
+      <span class="verdict-word">有条件通过</span>
+      <span class="verdict-detail">可以出发，但有 1 项警告（「控制台编码」等），现场留意</span>
+    </div>
+  </header>
+
+  <section class="strip" aria-label="结果统计">
+    <div class="count" data-status="pass">
+      <span class="num">10</span>
+      <span class="lbl">通过</span>
+    </div>
+    <div class="count" data-status="warn">
+      <span class="num">1</span>
+      <span class="lbl">警告</span>
+    </div>
+    <div class="count" data-status="fail">
+      <span class="num">0</span>
+      <span class="lbl">失败</span>
+    </div>
+    <div class="count" data-status="skip">
+      <span class="num">0</span>
+      <span class="lbl">跳过</span>
+    </div>
+  </section>
+
+  <dl class="facts">
+    <div>
+      <dt>开始时间</dt>
+      <dd>2026-11-23 18:17:05</dd>
+    </div>
+    <div>
+      <dt>总耗时</dt>
+      <dd>125ms</dd>
+    </div>
+    <div>
+      <dt>检查项</dt>
+      <dd>11 项</dd>
+    </div>
+    <div>
+      <dt>平台</dt>
+      <dd>Windows 11 10.0.26200</dd>
+    </div>
+    <div>
+      <dt>Python</dt>
+      <dd>3.11.2</dd>
+    </div>
+    <div>
+      <dt>终端编码</dt>
+      <dd>cp936</dd>
+    </div>
+    <div>
+      <dt>主机名</dt>
+      <dd>zxy</dd>
+    </div>
+    <div>
+      <dt>执行命令</dt>
+      <dd class="mono">kit doctor examples/doctor.yaml --html docs/samples/doctor-report.html --no-color</dd>
+    </div>
+  </dl>
+
+  <h2 class="section-title">检查明细</h2>
+  <section aria-label="检查明细">
+    <article class="check" data-status="pass">
+      <div class="check-head">
+        <span class="check-mark mark" aria-hidden="true">✓</span>
+        <span class="sr-only">通过</span>
+        <h3 class="check-name">演示门户端口</h3>
+        <span class="badge">port</span>
+        <span class="check-dur">57ms</span>
+      </div>
+      <p class="check-detail" data-status="pass">127.0.0.1:8080 正在监听 · 1ms · python.exe(PID 26548)</p>
+    </article>
+    <article class="check" data-status="pass">
+      <div class="check-head">
+        <span class="check-mark mark" aria-hidden="true">✓</span>
+        <span class="sr-only">通过</span>
+        <h3 class="check-name">报警通知服务端口</h3>
+        <span class="badge">port</span>
+        <span class="check-dur">38ms</span>
+      </div>
+      <p class="check-detail" data-status="pass">127.0.0.1:6379 正在监听 · 0ms · python.exe(PID 30820)</p>
+    </article>
+    <article class="check" data-status="pass">
+      <div class="check-head">
+        <span class="check-mark mark" aria-hidden="true">✓</span>
+        <span class="sr-only">通过</span>
+        <h3 class="check-name">门户健康检查</h3>
+        <span class="badge">service</span>
+        <span class="check-dur">7ms</span>
+      </div>
+      <p class="check-detail" data-status="pass">HTTP 200 · 7ms · application/json</p>
+    </article>
+    <article class="check" data-status="pass">
+      <div class="check-head">
+        <span class="check-mark mark" aria-hidden="true">✓</span>
+        <span class="sr-only">通过</span>
+        <h3 class="check-name">趋势接口数据量</h3>
+        <span class="badge">service</span>
+        <span class="check-dur">2ms</span>
+      </div>
+      <p class="check-detail" data-status="pass">HTTP 200 · 1ms · application/json</p>
+    </article>
+    <article class="check" data-status="pass">
+      <div class="check-head">
+        <span class="check-mark mark" aria-hidden="true">✓</span>
+        <span class="sr-only">通过</span>
+        <h3 class="check-name">演示数据新鲜度</h3>
+        <span class="badge">data</span>
+        <span class="check-dur">3ms</span>
+      </div>
+      <p class="check-detail" data-status="pass">measurements · 86,405 行 · 最新 32 秒前</p>
+    </article>
+    <article class="check" data-status="pass">
+      <div class="check-head">
+        <span class="check-mark mark" aria-hidden="true">✓</span>
+        <span class="sr-only">通过</span>
+        <h3 class="check-name">磁盘空间</h3>
+        <span class="badge">env</span>
+        <span class="check-dur">0ms</span>
+      </div>
+      <p class="check-detail" data-status="pass">C:\ 剩余 99.8GB（阈值 2.0GB）</p>
+    </article>
+    <article class="check" data-status="pass">
+      <div class="check-head">
+        <span class="check-mark mark" aria-hidden="true">✓</span>
+        <span class="sr-only">通过</span>
+        <h3 class="check-name">主机时区</h3>
+        <span class="badge">env</span>
+        <span class="check-dur">5ms</span>
+      </div>
+      <p class="check-detail" data-status="pass">+08:00 · 中国标准时间</p>
+    </article>
+    <article class="check" data-status="warn">
+      <div class="check-head">
+        <span class="check-mark mark" aria-hidden="true">!</span>
+        <span class="sr-only">警告</span>
+        <h3 class="check-name">控制台编码</h3>
+        <span class="badge">env</span>
+        <span class="check-dur">0ms</span>
+      </div>
+      <p class="check-detail" data-status="warn">系统首选编码是 cp936（期望 utf-8）</p>
+<p class="check-hint">中文可能显示成问号；临时用 chcp 65001，或设置 PYTHONUTF8=1</p>    </article>
+    <article class="check" data-status="pass">
+      <div class="check-head">
+        <span class="check-mark mark" aria-hidden="true">✓</span>
+        <span class="sr-only">通过</span>
+        <h3 class="check-name">运行环境版本</h3>
+        <span class="badge">version</span>
+        <span class="check-dur">3ms</span>
+      </div>
+      <ul class="items">
+        <li class="item" data-status="pass">
+          <span class="mark" aria-hidden="true">✓</span>
+          <span class="sr-only">通过</span>
+          <span class="label">python</span>
+          <span class="detail">3.11.2 · 满足 &gt;=3.11</span>
+        </li>
+        <li class="item" data-status="pass">
+          <span class="mark" aria-hidden="true">✓</span>
+          <span class="sr-only">通过</span>
+          <span class="label">typer</span>
+          <span class="detail">0.29.2 · 满足 &gt;=0.15</span>
+        </li>
+        <li class="item" data-status="pass">
+          <span class="mark" aria-hidden="true">✓</span>
+          <span class="sr-only">通过</span>
+          <span class="label">rich</span>
+          <span class="detail">15.0.0 · 满足 &gt;=13.9</span>
+        </li>
+      </ul>
+    </article>
+    <article class="check" data-status="pass">
+      <div class="check-head">
+        <span class="check-mark mark" aria-hidden="true">✓</span>
+        <span class="sr-only">通过</span>
+        <h3 class="check-name">本机网络探针</h3>
+        <span class="badge">network</span>
+        <span class="check-dur">0ms</span>
+      </div>
+      <p class="check-detail" data-status="pass">演示门户回环 可达 · 0ms</p>
+    </article>
+    <article class="check" data-status="pass">
+      <div class="check-head">
+        <span class="check-mark mark" aria-hidden="true">✓</span>
+        <span class="sr-only">通过</span>
+        <h3 class="check-name">投影与浏览器</h3>
+        <span class="badge">display</span>
+        <span class="check-dur">4ms</span>
+      </div>
+      <ul class="items">
+        <li class="item" data-status="pass">
+          <span class="mark" aria-hidden="true">✓</span>
+          <span class="sr-only">通过</span>
+          <span class="label">分辨率</span>
+          <span class="detail">3840×2160（阈值 1024×768）</span>
+        </li>
+        <li class="item" data-status="pass">
+          <span class="mark" aria-hidden="true">✓</span>
+          <span class="sr-only">通过</span>
+          <span class="label">浏览器</span>
+          <span class="detail">Chrome 158.0.8127.36 · Edge 158.0.4370.33</span>
+        </li>
+      </ul>
+    </article>
+  </section>
+
+
+  <p class="note">
+    <strong>怎么用这份报告：</strong>失败的项按顺序处理，警告项现场留意；所有检查都由声明文件
+    驱动（<span class="mono">examples\doctor.yaml</span>），改 YAML 就能加检查，不用改代码。
+  </p>
+
+  <footer>
+    <span>pre-sales-kit v0.1.0 · 2026-11-23 18:17:05</span>
+    <span>单文件报告 · 无外部资源 · 可直接转发或打印</span>
+  </footer>
+</div>
+</body>
+</html>

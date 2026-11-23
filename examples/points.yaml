@@ -1,0 +1,70 @@
+# 点位模型：kit seed --model examples/points.yaml --out examples/data/demo.db
+#
+# 每个点位都必须写 range —— 它是硬约束，生成的数据绝不越界。
+# model 可选：thermal / load_step / random_walk / triangle / counter
+# 参数说明：kit seed --list-models
+#
+version: 1
+name: 产线能耗与设备监控 · 演示点位
+description: 主轴温度与电流、功率因数、冷却液液位、当班产量
+interval: 5s
+
+points:
+  - name: 主轴温度
+    unit: ℃
+    model: thermal
+    baseline: 45
+    range: [20, 85]
+    decimals: 1
+    params:
+      tau_heat: 240      # 升温时间常数（秒）
+      tau_cool: 600      # 降温比升温慢：真实设备就是这样
+      ambient: 26
+      drift: 1.5         # 目标温度的日周期漂移
+      noise: 0.06
+
+  - name: 主轴电流
+    unit: A
+    model: load_step
+    range: [0, 32]
+    decimals: 2
+    params:
+      idle: 4.8
+      levels: [0.2, 0.35, 0.55]
+      dwell_min: 60
+      dwell_max: 300
+      inrush: 1.18       # 启动冲击，随后指数衰减
+      noise: 0.12
+
+  - name: 功率因数
+    model: random_walk
+    range: [0.85, 0.95]   # 硬约束：永远落在这个区间里
+    decimals: 3
+    params:
+      start: 0.91
+      theta: 0.4
+      sigma: 0.0008
+      noise: 0.0002
+
+  - name: 冷却液液位
+    unit: "%"
+    model: triangle
+    range: [0, 100]
+    decimals: 1
+    params:
+      period: 1500
+      duty: 0.55
+      low: 18
+      high: 88
+      noise: 0.3
+
+  - name: 当班产量
+    unit: 件
+    model: counter
+    range: [0, 6000]       # 一个 12 小时班次最多约 5,760 件
+    decimals: 0
+    params:
+      rate: 8
+      downtime_per_hour: 0.4
+      downtime_seconds: 90
+      reset_hours: [8, 20]   # 班次重置

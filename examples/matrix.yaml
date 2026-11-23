@@ -1,0 +1,77 @@
+# 兼容性矩阵：kit compat check --os "Windows Server 2016" --db "Oracle 11g"
+#
+# 顶层除了保留字段（product / updated / notes / combinations / labels），
+# 其余每个键都是一个「维度」，值可以是列表，也可以是 {label, items}。
+#
+version: 1
+product: 产线能耗与设备监控平台 v3.2
+updated: "2025-11-20"
+notes: 本矩阵覆盖 v3.2 的现场部署形态；组合未列出的，按各维度中最差的一项判断。
+
+labels:
+  os: 操作系统
+  db: 数据库
+  browser: 浏览器
+
+os:
+  - name: Windows Server 2012 R2
+    status: partial
+    note: 仅支持 v3.0 以前版本的采集驱动，需关闭 TLS 1.3
+  - name: Windows Server 2016
+    status: partial
+    note: 需补丁 KB4532945
+  - name: Windows Server 2019
+    status: full
+  - name: Windows Server 2022
+    status: full
+  - name: CentOS 7.9
+    status: partial
+    note: 需 glibc 2.28 以上；官方已停止维护
+  - name: Ubuntu 22.04 LTS
+    status: full
+  - name: 麒麟 V10 SP3
+    status: unknown
+    note: 有客户在用，尚未完成完整回归
+
+db:
+  - name: Oracle 19c
+    status: full
+  - name: Oracle 12c
+    status: partial
+    note: 需 12.2.0.3 以上补丁
+  - name: Oracle 11g
+    status: unsupported
+    note: 建议升级至 19c
+  - name: MySQL 8.0
+    status: full
+  - name: MySQL 5.7
+    status: partial
+    note: 2023 年 10 月已 EOL，仅存量项目维护
+  - name: PostgreSQL 15
+    status: full
+  - name: 达梦 DM8
+    status: partial
+    note: 需开启 Oracle 兼容模式
+
+browser:
+  - name: Chrome 100+
+    status: full
+  - name: Edge 100+
+    status: full
+  - name: 360 安全浏览器（极速模式）
+    status: partial
+    note: 必须切到极速内核，兼容模式不支持
+
+combinations:
+  - os: Windows Server 2016
+    db: Oracle 11g
+    status: unsupported
+    note: 补丁依赖与 Oracle 11g 客户端冲突
+  - os: Windows Server 2019
+    db: Oracle 19c
+    status: full
+    note: 已通过 48 小时压测
+  - os: CentOS 7.9
+    db: 达梦 DM8
+    status: partial
+    note: 需额外安装达梦客户端驱动

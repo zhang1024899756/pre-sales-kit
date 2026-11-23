@@ -1,0 +1,144 @@
+# kit doctor 的声明文件：改这里就能加检查，不用改代码。
+#
+#   kit doctor examples/doctor.yaml
+#   kit doctor examples/doctor.yaml --fix --yes --html out/doctor-report.html
+#
+version: 1
+title: 客户现场演示环境自检
+name: 华东某汽车零部件厂 · 产线能耗与设备监控演示
+description: 出差前一晚跑一遍，第二天到现场再跑一遍；红灯项按提示处理。
+
+defaults:
+  timeout: 20        # 单条检查的兜底超时（秒）
+  fix_wait: 2        # 修复后等多久再复检（秒）
+
+checks:
+  # ---------- 端口：演示服务该在的要在 ----------
+  - id: portal-port
+    name: 演示门户端口
+    type: port
+    tags: [演示]
+    params:
+      host: 127.0.0.1
+      port: 8080
+      expect: listening
+    fix:
+      action: start_service
+      command: "{python} {spec_dir}/demo_app.py --port 8080"
+      wait: 2.5
+      note: 拉起本地演示门户
+
+  - id: alarm-port
+    name: 报警通知服务端口
+    type: port
+    tags: [演示]
+    params:
+      host: 127.0.0.1
+      port: 6379
+      expect: listening
+    fix:
+      action: start_service
+      command: "{python} {spec_dir}/demo_app.py --port 6379 --role alarm"
+      wait: 1.5
+
+  # ---------- 服务：起来还要「是对的」 ----------
+  - id: portal-health
+    name: 门户健康检查
+    type: service
+    tags: [演示]
+    params:
+      url: http://127.0.0.1:8080/health
+      expect_status: 200
+      body_contains: '"status": "ok"'
+      timeout: 3
+      retries: 2
+    fix:
+      action: start_service
+      command: "{python} {spec_dir}/demo_app.py --port 8080"
+      wait: 2.5
+      note: 健康检查失败通常是服务没起来
+
+  - id: portal-api
+    name: 趋势接口数据量
+    type: service
+    tags: [演示]
+    params:
+      url: http://127.0.0.1:8080/api/measurements
+      expect_status: 200
+      timeout: 3
+      retries: 1
+
+  # ---------- 数据：别停在三天前 ----------
+  - id: demo-data
+    name: 演示数据新鲜度
+    type: data
+    tags: [数据]
+    params:
+      path: data/demo.db
+      table: measurements
+      time_column: ts
+      min_rows: 1000
+      latest_within: 24h
+    fix:
+      action: reseed
+      command: "{python} -m pre_sales_kit seed --model {spec_dir}/points.yaml --out {spec_dir}/data/demo.db --start -24h --interval 5s"
+      wait: 1
+      risk: high
+      note: 会重写演示数据库
+
+  # ---------- 环境 ----------
+  - id: disk
+    name: 磁盘空间
+    type: env
+    tags: [环境]
+    params:
+      disk_path: .
+      disk_min_free: 2GB
+
+  - id: timezone
+    name: 主机时区
+    type: env
+    tags: [环境]
+    params:
+      timezone: Asia/Shanghai
+
+  - id: console-encoding
+    name: 控制台编码
+    type: env
+    tags: [环境]
+    params:
+      encoding: utf-8
+
+  # ---------- 版本 ----------
+  - id: runtime
+    name: 运行环境版本
+    type: version
+    tags: [版本]
+    params:
+      tools:
+        python: ">=3.11"
+      python_packages:
+        typer: ">=0.15"
+        rich: ">=13.9"
+
+  # ---------- 网络：内网探针自测 ----------
+  - id: loopback
+    name: 本机网络探针
+    type: network
+    tags: [网络]
+    params:
+      timeout: 1.5
+      targets:
+        - name: 演示门户回环
+          host: 127.0.0.1
+          port: 8080
+          expect: reachable
+
+  # ---------- 显示 ----------
+  - id: screen
+    name: 投影与浏览器
+    type: display
+    tags: [显示]
+    params:
+      min_resolution: 1024x768
+      browsers: [chrome, edge]

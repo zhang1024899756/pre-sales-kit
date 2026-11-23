@@ -1,0 +1,80 @@
+[build-system]
+requires = ["hatchling>=1.25"]
+build-backend = "hatchling.build"
+
+[project]
+name = "pre-sales-kit"
+version = "0.1.0"
+description = "售前现场工具箱：演示环境自检、物理合理的演示数据生成、兼容性矩阵查询"
+readme = "README.md"
+requires-python = ">=3.11"
+license = { text = "MIT" }
+authors = [{ name = "Arvin", email = "zxy_email@qq.com" }]
+keywords = ["pre-sales", "field-engineering", "cli", "demo", "iot"]
+classifiers = [
+  "Environment :: Console",
+  "Intended Audience :: Information Technology",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Topic :: System :: Systems Administration",
+]
+dependencies = [
+  "typer>=0.15",
+  "rich>=13.9",
+  "pyyaml>=6.0",
+  "jinja2>=3.1",
+  # Windows 上没有系统时区库，ZoneInfo 需要它才能解析 Asia/Shanghai 这类名字
+  "tzdata>=2024.1; sys_platform == 'win32'",
+]
+
+[project.optional-dependencies]
+dev = [
+  "pytest>=8",
+  "pytest-cov>=5",
+  "mypy>=1.11",
+  "ruff>=0.6",
+  "types-PyYAML>=6.0",
+]
+
+[project.scripts]
+kit = "pre_sales_kit.cli:main"
+pskit = "pre_sales_kit.cli:main"
+
+[project.urls]
+Homepage = "https://github.com/arvinzxy/pre-sales-kit"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/pre_sales_kit"]
+
+[tool.hatch.build.targets.sdist]
+include = ["src/", "examples/", "docs/", "tests/"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
+filterwarnings = ["error::DeprecationWarning:pre_sales_kit.*"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+src = ["src", "tests"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM", "RET", "ARG", "PTH", "RUF"]
+ignore = [
+  "E501",   # 行宽交给格式化
+  "B008",   # Typer 的 Option() 就是写在默认值里的
+  "RUF001", # 中文全角标点是有意为之
+  "RUF002",
+  "RUF003",
+]
+
+[tool.mypy]
+python_version = "3.11"
+packages = ["pre_sales_kit"]
+mypy_path = "src"
+strict = false
+warn_unused_ignores = true
+warn_redundant_casts = true
+check_untyped_defs = true
+no_implicit_optional = true

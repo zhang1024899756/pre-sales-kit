@@ -1,0 +1,29 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+dist/
+build/
+
+# 测试 / 缓存 / 构建
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.uv-cache/
+.smoke-venv/
+.coverage
+htmlcov/
+
+# 工具产物（本地跑出来的报告与数据，演示样例会单独提交）
+out/
+*.db
+*.sqlite
+*.sqlite3
+
+# 编辑器 / 系统
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
