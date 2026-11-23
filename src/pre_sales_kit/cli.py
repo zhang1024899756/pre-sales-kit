@@ -6,6 +6,7 @@
 from __future__ import annotations
 
 import json
+import sys
 from pathlib import Path
 from typing import Annotated
 
@@ -822,7 +823,25 @@ def selfcheck_command(
     raise typer.Exit(code=selfcheck.exit_code(checks))
 
 
+def _ensure_utf8_stdio() -> None:
+    """把标准输出与标准错误切到 UTF-8。
+
+    Windows 默认代码页（cp1252 / cp936 等）下打印中文会抛 UnicodeEncodeError：
+    英文版 Windows 上 `kit selfcheck` 会直接崩在这里。输出流被测试框架接管时
+    没有 reconfigure，跳过即可。
+    """
+    for stream in (sys.stdout, sys.stderr):
+        reconfigure = getattr(stream, "reconfigure", None)
+        if reconfigure is None:
+            continue
+        try:
+            reconfigure(encoding="utf-8", errors="replace")
+        except (ValueError, OSError):
+            continue
+
+
 def main() -> None:
+    _ensure_utf8_stdio()
     app()
 
 
