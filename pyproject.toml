@@ -70,6 +70,7 @@ ignore = [
 ]
 
 [tool.mypy]
+platform = "win32"
 python_version = "3.11"
 packages = ["pre_sales_kit"]
 mypy_path = "src"
