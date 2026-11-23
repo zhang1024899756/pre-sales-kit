@@ -5,7 +5,7 @@
 
 from __future__ import annotations
 
-__version__ = "0.1.0"
+__version__ = "0.2.0"
 
 #: 报告与终端里展示的短名
 APP_NAME = "kit"

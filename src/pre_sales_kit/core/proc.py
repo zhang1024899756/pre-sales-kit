@@ -166,6 +166,25 @@ def process_name(pid: int) -> str | None:
         return None
 
 
+def pid_alive(pid: int) -> bool:
+    """这个 PID 现在还活着吗？
+
+    Windows 上用 tasklist 反查进程名：比 os.kill 可靠（Windows 上没有真正的信号 0），
+    也顺手证明「这个 PID 上真的是个进程」而不是刚被回收的空号。
+    """
+    if pid <= 0:
+        return False
+    if IS_WINDOWS:
+        return process_name(pid) is not None
+    try:
+        os.kill(pid, 0)
+    except ProcessLookupError:
+        return False
+    except PermissionError:
+        return True
+    return True
+
+
 def kill_process(pid: int, *, force: bool = True) -> str:
     """终止进程；返回给人看的结果描述。拒绝碰系统关键进程。"""
     if pid <= 4:

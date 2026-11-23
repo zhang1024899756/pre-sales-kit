@@ -33,5 +33,9 @@ jobs:
       - name: CLI 冒烟
         run: |
           kit --version
+          kit selfcheck
           kit doctor --list-types
           kit seed --list-models
+          kit init smoke-examples
+          kit compat matrix -m smoke-examples/matrix.yaml --md out/matrix.md
+          kit demo status --dir smoke-examples

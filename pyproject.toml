@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "pre-sales-kit"
-version = "0.1.0"
+version = "0.2.0"
 description = "售前现场工具箱：演示环境自检、物理合理的演示数据生成、兼容性矩阵查询"
 readme = "README.md"
 requires-python = ">=3.11"

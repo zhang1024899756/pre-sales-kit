@@ -16,11 +16,20 @@ build/
 .coverage
 htmlcov/
 
-# 工具产物（本地跑出来的报告与数据，演示样例会单独提交）
+# 工具产物（本地跑出来的报告与数据）
 out/
 *.db
 *.sqlite
 *.sqlite3
+
+# kit init 生成的示例目录：库里不放副本，只放生成它的代码
+/examples/
+/.kit/
+
+# 测试 / pip 的临时目录
+pytest-of-*/
+pip-*/
+/tmp*/
 
 # 编辑器 / 系统
 .idea/

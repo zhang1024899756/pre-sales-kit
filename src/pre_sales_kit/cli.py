@@ -30,7 +30,7 @@ app = typer.Typer(
     add_completion=False,
     no_args_is_help=True,
     context_settings={"help_option_names": ["-h", "--help"]},
-    help="售前现场工具箱：演示环境自检、物理合理的演示数据、兼容性矩阵。",
+    help="售前现场工具箱：环境自检、演示数据、兼容性矩阵，外加示例脚手架与演示服务。",
 )
 
 
@@ -50,10 +50,13 @@ def main_callback(
     """售前现场工具箱。
 
     \b
-    三个子命令：
-      kit doctor   演示环境自检（出门前跑一遍）
-      kit seed     生成物理合理的演示数据
-      kit compat   兼容性矩阵查询
+    六个子命令：
+      kit init       导出可运行的示例（装完第一步）
+      kit selfcheck  确认装对了：Python、依赖、模板、命令行入口
+      kit doctor     演示环境自检（出门前跑一遍）
+      kit demo       演示服务：起、停、查、开
+      kit seed       生成物理合理的演示数据
+      kit compat     兼容性矩阵查询
     """
 
 
@@ -178,6 +181,100 @@ def _print_types(console) -> None:
     console.print("  内置检查类型")
     console.print()
     console.print(table)
+
+
+@app.command("init")
+def init_command(
+    directory: Annotated[
+        Path, typer.Argument(help="把示例写到哪个目录（默认 ./examples）")
+    ] = Path("examples"),
+    force: Annotated[
+        bool, typer.Option("--force", "-f", help="覆盖已存在的同名文件（先备份成 .bak）")
+    ] = False,
+    only: Annotated[
+        list[str] | None, typer.Option("--only", help="只导出指定文件，可重复")
+    ] = None,
+    list_files: Annotated[
+        bool, typer.Option("--list", help="只列出可导出的示例，不写文件")
+    ] = False,
+    no_color: Annotated[bool, typer.Option("--no-color", help="关闭颜色")] = False,
+) -> None:
+    """导出三份可运行的示例声明：doctor.yaml / points.yaml / matrix.yaml。
+
+    \b
+    装完 kit 之后先跑这个：pip 装出来的人手里没有仓库里的 examples/，
+    而后面所有命令都靠这三份声明起步。
+
+    已存在的文件默认不覆盖——现场机器上的 YAML 可能已经被改过，那才是真的资产。
+
+    \b
+    示例：
+      kit init                       # 写到 ./examples
+      kit init demo --only doctor.yaml
+      kit init --force               # 覆盖，原文件备份为 .bak
+    """
+    from pre_sales_kit import scaffold
+    from pre_sales_kit.core.console import banner, check_line, hint_line, section
+    from pre_sales_kit.core.status import Status
+
+    console = make_console(no_color=no_color)
+
+    if list_files:
+        from rich.table import Table
+
+        table = Table(show_header=True, header_style="bold", box=None, padding=(0, 2))
+        table.add_column("文件")
+        table.add_column("说明")
+        for name in scaffold.FILES:
+            table.add_row(name, scaffold.DESCRIPTION.get(name, ""))
+        console.print()
+        console.print("  可导出的示例")
+        console.print()
+        console.print(table)
+        raise typer.Exit(code=0)
+
+    try:
+        results = scaffold.export(directory, names=only, force=force)
+    except KitError as exc:
+        error(console, str(exc), exc.hint)
+        raise typer.Exit(code=2) from exc
+
+    banner(
+        console,
+        "示例脚手架",
+        [
+            f"目标目录 {Path(directory).resolve()}",
+            f"pre-sales-kit {__version__}",
+        ],
+    )
+
+    status_of = {
+        "created": (Status.PASS, "新建"),
+        "overwritten": (Status.WARN, "覆盖（原文件已备份）"),
+        "identical": (Status.SKIP, "已是最新"),
+        "skipped": (Status.WARN, "保留原文件"),
+    }
+    section(console, "写入")
+    for result in results:
+        status, word = status_of.get(result.action, (Status.PASS, result.action))
+        detail = f"{word} · {result.detail}" if result.detail else word
+        check_line(console, status, result.name, detail, label_width=18)
+
+    written = sum(1 for result in results if result.written)
+    console.print()
+    if written == 0 and any(result.action == "skipped" for result in results):
+        hint_line(
+            console,
+            "有文件没有写入（内容和你手上的不同）。要拿最新样板就加 --force，原文件会备份成 .bak。",
+        )
+        console.print()
+
+    section(console, "下一步")
+    for command, note in scaffold.next_steps(directory):
+        hint_line(console, f"$ {command}", indent=4)
+        hint_line(console, note, indent=8)
+    console.print()
+    raise typer.Exit(code=0)
 
 
 compat_app = typer.Typer(help="兼容性矩阵查询。", no_args_is_help=True)
@@ -424,6 +521,305 @@ def _compat_query(
         key, value = raw.split("=", 1)
         query[key.strip()] = value.strip()
     return query
+
+
+demo_app = typer.Typer(
+    help="演示服务：一键起、停、查、开。只碰自己起的进程。",
+    no_args_is_help=True,
+)
+app.add_typer(demo_app, name="demo")
+
+
+def _parse_services(raw: list[str] | None) -> list[tuple[str, int]]:
+    """--service 的解析：portal=8080 / 8080（默认角色 portal）/ alarm=6379。"""
+    from pre_sales_kit.core.errors import KitError as _KitError
+    from pre_sales_kit.demo import manager
+
+    if not raw:
+        return list(manager.DEFAULT_SERVICES)
+    targets: list[tuple[str, int]] = []
+    for item in raw:
+        role, _, port_text = item.partition("=")
+        if not port_text:
+            role, port_text = "portal", item
+        try:
+            port = int(port_text)
+        except ValueError as exc:
+            raise _KitError(
+                f"--service 的端口不是数字：{item!r}",
+                hint='写成 "portal=8080"，或只写端口 8080（默认角色是 portal）',
+            ) from exc
+        if not 1 <= port <= 65535:
+            raise _KitError(f"端口超出范围：{port}", hint="1-65535 之间")
+        targets.append((role.strip() or "portal", port))
+    return targets
+
+
+def _print_outcomes(console, outcomes, *, title: str) -> int:
+    """打印一批动作结果，返回应该用的退出码。"""
+    from pre_sales_kit.core.console import check_line, section
+    from pre_sales_kit.core.status import Status
+
+    status_of = {
+        "started": Status.PASS,
+        "running": Status.SKIP,
+        "stopped": Status.PASS,
+        "gone": Status.SKIP,
+        "skipped": Status.WARN,
+        "failed": Status.FAIL,
+    }
+    section(console, title)
+    for outcome in outcomes:
+        port = f":{outcome.port}" if outcome.port else ""
+        check_line(
+            console,
+            status_of.get(outcome.status, Status.WARN),
+            f"{outcome.label}{port}",
+            outcome.detail,
+            label_width=22,
+        )
+    console.print()
+    return 1 if any(outcome.status == "failed" for outcome in outcomes) else 0
+
+
+@demo_app.command("up")
+def demo_up(
+    service: Annotated[
+        list[str] | None,
+        typer.Option(
+            "--service",
+            help='角色=端口，可重复；默认 "portal=8080" 与 "alarm=6379"',
+        ),
+    ] = None,
+    only: Annotated[
+        list[str] | None, typer.Option("--only", help="只起这些角色，可重复")
+    ] = None,
+    db: Annotated[
+        str | None, typer.Option("--db", help="演示数据库路径（默认 data/demo.db）")
+    ] = None,
+    wait: Annotated[float, typer.Option("--wait", help="每个服务最多等多少秒起来")] = 5.0,
+    directory: Annotated[
+        Path, typer.Option("--dir", help="状态文件放在这个目录的 .kit/ 下")
+    ] = Path(),
+    no_color: Annotated[bool, typer.Option("--no-color", help="关闭颜色")] = False,
+) -> None:
+    """后台拉起演示服务，并把 PID 记进 .kit/demo.json。
+
+    \b
+    端口已经被别的进程占着时**不会去杀它**，只报告——
+    客户机器上的 8080 可能是他们真实的服务。
+
+    \b
+    示例：
+      kit demo up
+      kit demo up --only portal
+      kit demo up --service portal=8090 --service alarm=6380
+    """
+    from pre_sales_kit.core.errors import KitError as _KitError
+    from pre_sales_kit.demo import manager
+
+    console = make_console(no_color=no_color)
+    try:
+        targets = _parse_services(service)
+    except _KitError as exc:
+        error(console, str(exc), exc.hint)
+        raise typer.Exit(code=2) from exc
+    if only:
+        wanted = set(only)
+        targets = [item for item in targets if item[0] in wanted]
+        if not targets:
+            error(console, "筛选后没有要起的服务", "检查 --only 的角色名是不是 portal / alarm")
+            raise typer.Exit(code=2)
+
+    root = directory.resolve()
+    try:
+        outcomes = manager.start(root, targets, db=db, wait=wait)
+    except _KitError as exc:
+        error(console, str(exc), exc.hint)
+        raise typer.Exit(code=2) from exc
+
+    code = _print_outcomes(console, outcomes, title="启动")
+    if code == 0:
+        from pre_sales_kit.core.console import hint_line
+
+        port = next((item.port for item in outcomes if item.role == "portal" and item.port), None)
+        if port:
+            hint_line(console, f"打开看看：http://127.0.0.1:{port}/   （或 kit demo open）")
+        hint_line(console, "停掉：kit demo down")
+        console.print()
+    raise typer.Exit(code=code)
+
+
+@demo_app.command("down")
+def demo_down(
+    only: Annotated[
+        list[str] | None, typer.Option("--only", help="只停这些角色，可重复")
+    ] = None,
+    directory: Annotated[
+        Path, typer.Option("--dir", help="状态文件放在这个目录的 .kit/ 下")
+    ] = Path(),
+    no_color: Annotated[bool, typer.Option("--no-color", help="关闭颜色")] = False,
+) -> None:
+    """停掉 kit 起过的演示服务。
+
+    \b
+    记录里的 PID 已经换成了别的进程时，只清记录、不动手——防止误杀。
+    """
+    from pre_sales_kit.core.errors import KitError as _KitError
+    from pre_sales_kit.demo import manager
+
+    console = make_console(no_color=no_color)
+    try:
+        outcomes = manager.stop(directory.resolve(), roles=only)
+    except _KitError as exc:
+        error(console, str(exc), exc.hint)
+        raise typer.Exit(code=2) from exc
+    if not outcomes:
+        from pre_sales_kit.core.console import hint_line
+
+        hint_line(console, "没有需要停的服务（.kit/demo.json 里是空的）", indent=2)
+        console.print()
+        raise typer.Exit(code=0)
+    raise typer.Exit(code=_print_outcomes(console, outcomes, title="停止"))
+
+
+@demo_app.command("status")
+def demo_status(
+    directory: Annotated[
+        Path, typer.Option("--dir", help="状态文件放在这个目录的 .kit/ 下")
+    ] = Path(),
+    json_out: Annotated[bool, typer.Option("--json", help="输出 JSON")] = False,
+    no_color: Annotated[bool, typer.Option("--no-color", help="关闭颜色")] = False,
+) -> None:
+    """看演示服务现在是什么状态：在跑、掉了，还是端口被别人占了。"""
+    from pre_sales_kit.core.errors import KitError as _KitError
+    from pre_sales_kit.demo import manager
+
+    console = make_console(no_color=no_color)
+    try:
+        rows, hints = manager.status(directory.resolve())
+    except _KitError as exc:
+        error(console, str(exc), exc.hint)
+        raise typer.Exit(code=2) from exc
+
+    if json_out:
+        payload = {
+            "services": [
+                {
+                    "role": row.record.role,
+                    "port": row.record.port,
+                    "pid": row.record.pid,
+                    "state": row.state,
+                    "detail": row.detail,
+                    "started": row.record.started,
+                }
+                for row in rows
+            ],
+            "hints": hints,
+        }
+        typer.echo(json.dumps(payload, ensure_ascii=False, indent=2))
+        raise typer.Exit(code=0)
+
+    from pre_sales_kit.core.console import check_line, hint_line, section
+    from pre_sales_kit.core.status import Status
+
+    status_of = {
+        "running": Status.PASS,
+        "starting": Status.WARN,
+        "dead": Status.FAIL,
+        "taken": Status.WARN,
+        "unverified": Status.WARN,
+    }
+    if not rows:
+        hint_line(console, "没有记录。起服务：kit demo up", indent=2)
+    else:
+        section(console, "演示服务")
+        for row in rows:
+            check_line(
+                console,
+                status_of.get(row.state, Status.WARN),
+                f"{row.record.label}:{row.record.port}",
+                row.detail,
+                label_width=24,
+            )
+    for hint in hints:
+        hint_line(console, f"· {hint}", indent=4)
+    console.print()
+    raise typer.Exit(code=0)
+
+
+@demo_app.command("open")
+def demo_open(
+    port: Annotated[
+        int | None, typer.Option("--port", help="要打开的端口（默认用状态里的门户端口）")
+    ] = None,
+    directory: Annotated[
+        Path, typer.Option("--dir", help="状态文件放在这个目录的 .kit/ 下")
+    ] = Path(),
+    no_color: Annotated[bool, typer.Option("--no-color", help="关闭颜色")] = False,
+) -> None:
+    """用默认浏览器打开演示门户。"""
+    from pre_sales_kit.demo import manager
+
+    console = make_console(no_color=no_color)
+    target = port or manager.guess_port(directory.resolve())
+    opened = manager.open_port(target)
+    from pre_sales_kit.core.console import hint_line
+
+    if opened:
+        hint_line(console, f"已打开 http://127.0.0.1:{target}/", indent=2)
+    else:
+        error(console, "没能拉起浏览器", f"手动打开 http://127.0.0.1:{target}/")
+        console.print()
+        raise typer.Exit(code=1)
+    console.print()
+    raise typer.Exit(code=0)
+
+
+@app.command("selfcheck")
+def selfcheck_command(
+    json_out: Annotated[bool, typer.Option("--json", help="输出 JSON（给脚本用）")] = False,
+    directory: Annotated[
+        Path, typer.Option("--dir", help="检查这个目录能否写报告和演示数据")
+    ] = Path(),
+    no_color: Annotated[bool, typer.Option("--no-color", help="关闭颜色")] = False,
+) -> None:
+    """安装自检：Python 版本、依赖、报告模板、示例文件、命令行入口。
+
+    \b
+    装完立刻跑一次。它回答的问题不是「装了吗」，而是「装对了吗」——
+    包括 PATH 里的 kit 是不是新版本、模板有没有漏装。
+
+    \b
+    示例：
+      kit selfcheck
+      kit selfcheck --json
+    """
+    import time as _time
+
+    from pre_sales_kit import selfcheck
+    from pre_sales_kit.core.console import banner
+
+    console = make_console(no_color=no_color)
+    started = _time.perf_counter()
+    checks = selfcheck.run_checks(directory=directory)
+
+    if json_out:
+        typer.echo(selfcheck.dumps(checks))
+        raise typer.Exit(code=selfcheck.exit_code(checks))
+
+    from pre_sales_kit.core.proc import platform_summary, python_version
+
+    banner(
+        console,
+        "安装自检",
+        [
+            f"pre-sales-kit {__version__} · Python {python_version()}",
+            f"{platform_summary()} · {Path.cwd()}",
+        ],
+    )
+    selfcheck.print_checks(console, checks, started=started)
+    raise typer.Exit(code=selfcheck.exit_code(checks))
 
 
 def main() -> None:
